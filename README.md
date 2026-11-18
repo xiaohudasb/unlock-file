@@ -64,7 +64,7 @@ flowchart TD
 ### 方式一：安装脚本
 
 ```powershell
-git clone https://github.com/<your-name>/claude-skill-unlock-file.git
+git clone https://github.com/xiaohudasb/claude-skill-unlock-file.git
 cd claude-skill-unlock-file
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -74,8 +74,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 把仓库复制到 Claude Code 的用户技能目录，**文件夹名必须是 `unlock-file`**：
 
 ```powershell
-git clone https://github.com/<your-name>/claude-skill-unlock-file.git
-Copy-Item -Recurse -Force .\claude-skill-unlock-file "$env:USERPROFILE\.claude\skills\unlock-file"
+git clone https://github.com/xiaohudasb/claude-skill-unlock-file.git
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\skills\unlock-file" | Out-Null
+Copy-Item -Recurse -Force .\claude-skill-unlock-file\* "$env:USERPROFILE\.claude\skills\unlock-file"
 ```
 
 安装后重新打开 Claude Code 会话，技能会自动出现在可用列表中。
@@ -188,6 +189,7 @@ claude-skill-unlock-file/
 ├── SKILL.md              # Claude Code 技能说明（触发条件、安全规则、工作流）
 ├── README.md
 ├── LICENSE
+├── .gitignore
 ├── install.ps1           # Windows 一键安装
 └── scripts/
     └── unlock_file.py    # 检测与解除占用脚本

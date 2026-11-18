@@ -378,7 +378,7 @@ def run(path, save=False, no_close=False, force_kill=False):
     ) or "未知进程"
     result.update(
         status="locked_unknown",
-        message=f"文件仍被占用：{owners_txt}。可请用户关闭该文档，或改用 --close-window / --force-kill（需用户明确同意）。")
+        message=f"文件仍被占用：{owners_txt}。可请用户关闭该文档，或改用 --force-kill（需用户明确同意）。")
     return result, 3
 
 
