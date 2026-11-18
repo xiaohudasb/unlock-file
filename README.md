@@ -1,10 +1,12 @@
 # unlock-file
 
-**让 Claude Code 在写文件失败时，自动解除 Windows 文件占用。**
+**让 AI agent 在写文件失败时，自动解除 Windows 文件占用。**
 
-一个 [Claude Code](https://claude.com/claude-code) 技能（Skill）：当 AI 改 Excel / Word / WPS 文件时报 `PermissionError`、`[WinError 32]`、`另一个程序正在使用此文件`，它会定位占用进程并**优雅关闭**文档，然后重试写入——不静默丢数据，不无脑强杀。
+一个按 [Agent Skills](https://agentskills.io) 开放格式组织的技能：当 AI 改 Excel / Word / WPS 文件时报 `PermissionError`、`[WinError 32]`、`另一个程序正在使用此文件`，它会定位占用进程并**优雅关闭**文档，然后重试写入——不静默丢数据，不无脑强杀。
 
 > Windows 10 / 11 · Python 3.8+ · Excel / Word / WPS 均可
+>
+> 任何支持 Agent Skills 格式的客户端都可以加载；Claude Code 是其中之一。
 
 ---
 
@@ -20,7 +22,7 @@ PermissionError: [WinError 32] 另一个程序正在使用此文件，进程无�
 
 ## 特性
 
-- **自动触发**：遇到文件占用类错误时 Claude 会调用它，无需你手动操作
+- **按需加载**：客户端根据 `description` 判断任务是否相关；是否自动调用由客户端决定
 - **三层定位**：写锁检测 → Restart Manager 查持锁进程 → COM / 窗口消息精准关闭
 - **WPS 适配**：处理 WPS 多进程架构（窗口进程 ≠ 持锁进程）的坑
 - **数据安全**：关闭前能读到 `Saved` 状态；有未保存修改时拒绝擅自关闭，改为询问用户
@@ -36,7 +38,7 @@ flowchart TD
     C --> D{COM 能找到该文档?}
     D -- 能 --> E{有未保存修改?}
     E -- 无 --> F[COM 精确关闭该文档]
-    E -- 有 --> G[返回 needs_decision<br/>由 Claude 询问用户]
+    E -- 有 --> G[返回 needs_decision<br/>由助手询问用户]
     D -- 不能 --> H[按窗口标题匹配文档窗口<br/>发送 WM_CLOSE]
     H --> I{锁已释放?}
     I -- 是 --> Z
@@ -69,26 +71,50 @@ cd claude-skill-unlock-file
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
+默认安装到 Claude Code 的用户技能目录：
+
+```text
+%USERPROFILE%\.claude\skills\unlock-file
+```
+
+安装到其他 Agent Skills 客户端时，用 `-Dest` 指定该客户端的技能目录：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Dest "C:\path\to\skills\unlock-file"
+```
+
+`-Dest` 的最后一级目录必须是 `unlock-file`，因为 Agent Skills 规范要求技能名与父目录同名。
+
 ### 方式二：手动安装
 
-把仓库复制到 Claude Code 的用户技能目录，**文件夹名必须是 `unlock-file`**：
+以 Claude Code 为例：
 
 ```powershell
 git clone https://github.com/xiaohudasb/claude-skill-unlock-file.git
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\skills\unlock-file" | Out-Null
-Copy-Item -Recurse -Force .\claude-skill-unlock-file\* "$env:USERPROFILE\.claude\skills\unlock-file"
+$dest = "$env:USERPROFILE\.claude\skills\unlock-file"
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+Copy-Item -Recurse -Force .\claude-skill-unlock-file\unlock-file\* $dest
 ```
 
-安装后重新打开 Claude Code 会话，技能会自动出现在可用列表中。
+其他客户端：把仓库里的 `unlock-file` 文件夹整个复制到该客户端的技能目录，并确保文件夹名是 `unlock-file`。不同客户端使用不同的技能目录，具体位置请查阅对应客户端文档。
+
+安装后重新打开客户端会话；是否自动出现在可用技能列表中，由客户端实现决定。
 
 ## 使用
 
-### 在 Claude Code 中（主要用法）
+### 在 Agent Skills 客户端中
 
-不需要做任何事。AI 写文件遇到占用时，会自动执行：
+支持自动加载的客户端会在任务匹配时读取本技能；不支持自动加载的客户端需要你手动触发，或把技能内容加入对话。核心命令相同，**在 `SKILL.md` 所在目录执行**：
 
 ```bash
-python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/项目/台账.xlsx" --json
+python scripts/unlock_file.py "D:/项目/台账.xlsx" --json
+```
+
+例如在 Claude Code 中，技能通常位于 `~/.claude/skills/unlock-file`：
+
+```bash
+cd "$HOME/.claude/skills/unlock-file"
+python scripts/unlock_file.py "D:/项目/台账.xlsx" --json
 ```
 
 也可以直接说：
@@ -97,18 +123,20 @@ python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/项目/台�
 
 ### 命令行
 
+以下命令在仓库根目录执行：
+
 ```bash
 # 默认：检测 + 优雅关闭
-python scripts/unlock_file.py "D:/项目/台账.xlsx" --json
+python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --json
 
 # 只检测，不关闭任何文件
-python scripts/unlock_file.py "D:/项目/台账.xlsx" --no-close --json
+python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --no-close --json
 
 # 有未保存修改时保存后关闭（仅 COM 路线有效）
-python scripts/unlock_file.py "D:/项目/台账.xlsx" --save --json
+python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --save --json
 
 # 强杀占用进程（最后手段，未保存修改会丢失）
-python scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill --json
+python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill --json
 ```
 
 | 参数 | 说明 |
@@ -158,12 +186,21 @@ python scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill --json
 这是本技能最看重的部分——**它操作的是你正在编辑的文档**：
 
 1. **默认只做优雅关闭**：发送 `WM_CLOSE`，等价于点右上角 ×。应用自己决定是否弹保存提示，不会静默丢弃修改。
-2. **有修改不擅自动手**：COM 能读到 `Saved == False` 时，脚本直接返回 `needs_decision`，由 Claude 询问你。
+2. **有修改不擅自动手**：COM 能读到 `Saved == False` 时，脚本直接返回 `needs_decision`，由助手询问你。
 3. **强杀需明确授权**：`--force-kill` 不会自动使用。
 4. **不删除 `~$` 锁文件**：应用运行时删锁文件可能损坏文档，脚本只报告。
 5. **不碰无关进程**：窗口匹配要求标题含目标文件名，且限制在已知 Office/WPS 窗口类；定位不到就停下报告。
 
 ## 兼容性
+
+### 客户端
+
+| 客户端 | 说明 |
+|---|---|
+| Claude Code | `install.ps1` 默认安装到 `%USERPROFILE%\.claude\skills\unlock-file`；技能会自动加载 |
+| 其他支持 Agent Skills 的客户端 | 把 `unlock-file/` 复制到该客户端的技能目录；是否自动触发由客户端决定 |
+
+### 系统与应用
 
 | 项目 | 支持情况 |
 |---|---|
@@ -186,13 +223,14 @@ python scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill --json
 
 ```
 claude-skill-unlock-file/
-├── SKILL.md              # Claude Code 技能说明（触发条件、安全规则、工作流）
+├── unlock-file/
+│   ├── SKILL.md              # Agent Skill 说明（触发条件、安全规则、工作流）
+│   └── scripts/
+│       └── unlock_file.py    # 检测与解除占用脚本
 ├── README.md
 ├── LICENSE
 ├── .gitignore
-├── install.ps1           # Windows 一键安装
-└── scripts/
-    └── unlock_file.py    # 检测与解除占用脚本
+└── install.ps1               # Windows 安装脚本
 ```
 
 ## 开发与测试
@@ -203,10 +241,10 @@ python -c "import openpyxl; w=openpyxl.Workbook(); w.save('test.xlsx')"
 powershell -c "Start-Process test.xlsx"    # 用 WPS/Excel 打开
 
 # 2. 只检测
-python scripts/unlock_file.py test.xlsx --no-close --json    # 期望 exit=3, status=locked
+python unlock-file/scripts/unlock_file.py test.xlsx --no-close --json    # 期望 exit=3, status=locked
 
 # 3. 解除
-python scripts/unlock_file.py test.xlsx --json               # 期望 exit=0, status=closed
+python unlock-file/scripts/unlock_file.py test.xlsx --json               # 期望 exit=0, status=closed
 
 # 4. 验证可写
 python -c "import openpyxl; w=openpyxl.load_workbook('test.xlsx'); w.save('test.xlsx')"
@@ -214,9 +252,11 @@ python -c "import openpyxl; w=openpyxl.load_workbook('test.xlsx'); w.save('test.
 
 ## English
 
-A Claude Code skill for Windows that automatically releases file locks (Excel / Word / WPS) before AI edits a file. It detects the lock, identifies the owning process via the Windows Restart Manager, and gracefully closes only the target document window. Unsaved changes are never discarded silently: the tool reports `needs_decision` so the user can choose. Force-kill is opt-in only. No network access.
+A portable Agent Skill for Windows that automatically releases file locks (Excel / Word / WPS) before an AI agent edits a file. It detects the lock, identifies the owning process via the Windows Restart Manager, and gracefully closes only the target document window. Unsaved changes are never discarded silently: the tool reports `needs_decision` so the user can choose. Force-kill is opt-in only. No network access.
 
-Install by copying this repository to `%USERPROFILE%\.claude\skills\unlock-file`, then start a new Claude Code session.
+It follows the [Agent Skills](https://agentskills.io) open format (`SKILL.md` plus optional scripts) and can be loaded by any compatible client. Claude Code is one supported client.
+
+Install with `install.ps1` (defaults to Claude Code's `%USERPROFILE%\.claude\skills\unlock-file`), or copy the `unlock-file/` folder into your client's skills directory. The folder must be named `unlock-file`.
 
 ## License
 

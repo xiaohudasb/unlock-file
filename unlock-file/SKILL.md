@@ -1,6 +1,8 @@
 ---
 name: unlock-file
 description: 写入/替换文件失败并报 PermissionError、WinError 32、"另一个程序正在使用此文件"、EBUSY，或需要修改正被 Excel/Word/WPS 打开的 xlsx/docx/pptx 时使用。自动定位占用进程，优雅关闭文档窗口（不会静默丢失未保存修改），再重试写入。
+license: MIT
+compatibility: Windows 10/11; Python 3.8+; pywin32 optional (COM route is more precise)
 ---
 
 # 解除文件占用
@@ -9,7 +11,7 @@ description: 写入/替换文件失败并报 PermissionError、WinError 32、"�
 
 出现以下任一情况时，先用本技能解除占用，再执行原本的写入/覆盖操作：
 
-- Write / Edit / Python 的 `openpyxl.save()` / `shutil.move()` 报 `PermissionError`、`[WinError 32]`、"另一个程序正在使用此文件"、`EBUSY`
+- 写文件、编辑文件或脚本保存时（例如 Python 的 `openpyxl.save()`、`shutil.move()`）报 `PermissionError`、`[WinError 32]`、"另一个程序正在使用此文件"、`EBUSY`
 - 目标文件旁存在 `~$文件名` 临时锁文件
 - 已知用户正开着 Excel / Word / WPS 且需要改写该文件
 
@@ -18,14 +20,18 @@ description: 写入/替换文件失败并报 PermissionError、WinError 32、"�
 1. **默认只做优雅关闭**：发送窗口关闭消息，等价于点右上角 ×。有未保存修改时，应用会自己弹「是否保存」，不会静默丢数据。
 2. **绝不擅自 `--force-kill`**。只有用户明确说"强杀/结束进程/放弃修改"，才可加这个参数；执行前再确认一次。
 3. **绝不删除 `~$` 锁文件**。应用还开着时删锁文件可能损坏文档，脚本只报告、不处理。
-4. **`needs_decision` / `needs_save_confirm` 必须交还给用户**：用 AskUserQuestion 让用户选「保存并关闭 / 放弃修改并关闭 / 取消」，不要自己替用户决定。
+4. **`needs_decision` / `needs_save_confirm` 必须交还给用户**：使用当前客户端提供的提问/选择界面，让用户选「保存并关闭 / 放弃修改并关闭 / 取消」。如果客户端没有这类工具，就在回复中列出三个选项并等待用户选择；不要自己替用户决定。
 5. 被关闭的是**用户正在编辑的文档**，操作前先说明一句"检测到该文件正被 xxx 打开，我先帮你关掉"，让用户有预期。
 
 ## 标准流程
 
+本技能的所有命令都以 `SKILL.md` 所在目录为技能根目录。先解析出该目录，再执行：
+
 ```bash
-python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "<文件绝对路径>" --json
+python scripts/unlock_file.py "<文件绝对路径>" --json
 ```
+
+不要假定技能安装在某个固定路径（例如 `~/.claude/skills`）；不同客户端的技能目录不同。如果你的运行环境不会自动把工作目录切到技能根目录，请先 `cd` 到本 `SKILL.md` 所在目录，或使用客户端提供的技能目录变量。
 
 1. 执行上面的检测命令（默认就会尝试优雅关闭）。
 2. 按返回的 `status` 处理：
@@ -46,16 +52,16 @@ python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "<文件绝对�
 
 ```bash
 # 默认：检测 + 优雅关闭（推荐）
-python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/x/报告.xlsx" --json
+python scripts/unlock_file.py "D:/x/报告.xlsx" --json
 
 # 只检测，不做任何关闭动作
-python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/x/报告.xlsx" --no-close --json
+python scripts/unlock_file.py "D:/x/报告.xlsx" --no-close --json
 
 # 用户已同意“保存后关闭”（仅对 COM 能读到的文档有效）
-python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/x/报告.xlsx" --save --json
+python scripts/unlock_file.py "D:/x/报告.xlsx" --save --json
 
 # 用户明确同意强杀（最后手段，会丢未保存修改）
-python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/x/报告.xlsx" --force-kill --json
+python scripts/unlock_file.py "D:/x/报告.xlsx" --force-kill --json
 ```
 
 退出码：`0` 已解除/未占用，`2` 需要用户决定，`3` 无法安全解除，`1` 脚本错误。
@@ -73,9 +79,9 @@ python "$HOME/.claude/skills/unlock-file/scripts/unlock_file.py" "D:/x/报告.xl
 
 > 用户：帮我把台账加上这两笔，但是 Excel 开着改不了。
 >
-> Claude：检测到文件正被 WPS 打开，我先帮你关掉再写。
+> 助手：检测到文件正被 WPS 打开，我先帮你关掉再写。
 > → 执行脚本 → `closed` → 用 openpyxl 写入 → 回报"已关闭 WPS 中的台账并写入成功，重新打开即可看到"。
 
 > 返回 `needs_decision`（`modified: true`）
 >
-> Claude：台账里有未保存的修改，你要「保存并关闭」还是「放弃修改并关闭」？
+> 助手：台账里有未保存的修改，你要「保存并关闭」还是「放弃修改并关闭」？

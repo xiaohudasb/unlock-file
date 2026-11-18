@@ -1,19 +1,35 @@
-# unlock-file installer for Claude Code (Windows)
-# Usage: powershell -ExecutionPolicy Bypass -File .\install.ps1
+# unlock-file installer for Agent Skills clients (Windows)
+# Default target: Claude Code user skills directory.
+#
+# Usage:
+#   powershell -ExecutionPolicy Bypass -File .\install.ps1
+#   powershell -ExecutionPolicy Bypass -File .\install.ps1 -Dest "C:\path\to\skills\unlock-file"
+
+param(
+    [string]$Dest = (Join-Path $env:USERPROFILE ".claude\skills\unlock-file")
+)
 
 $ErrorActionPreference = "Stop"
 
-$dest = Join-Path $env:USERPROFILE ".claude\skills\unlock-file"
+$Dest = $Dest.TrimEnd('\', '/')
+$skillSrc = Join-Path $PSScriptRoot "unlock-file"
 
-New-Item -ItemType Directory -Force -Path $dest | Out-Null
-Copy-Item -Force (Join-Path $PSScriptRoot "SKILL.md") $dest
+if (-not (Test-Path (Join-Path $skillSrc "SKILL.md"))) {
+    throw "Cannot find unlock-file\SKILL.md next to install.ps1."
+}
+if ((Split-Path -Leaf $Dest) -ne "unlock-file") {
+    throw "Destination folder must be named 'unlock-file' (it must match the skill name). Got: $Dest"
+}
 
-$scriptDest = Join-Path $dest "scripts"
+New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+Copy-Item -Force (Join-Path $skillSrc "SKILL.md") $Dest
+
+$scriptDest = Join-Path $Dest "scripts"
 if (Test-Path $scriptDest) { Remove-Item -Recurse -Force $scriptDest }
 New-Item -ItemType Directory -Force -Path $scriptDest | Out-Null
-Copy-Item -Force (Join-Path $PSScriptRoot "scripts\unlock_file.py") $scriptDest
+Copy-Item -Force (Join-Path $skillSrc "scripts\unlock_file.py") $scriptDest
 
-Write-Host "Installed to: $dest" -ForegroundColor Green
+Write-Host "Installed to: $Dest" -ForegroundColor Green
 
 # --- dependency check ---
 $py = Get-Command python -ErrorAction SilentlyContinue
@@ -34,4 +50,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Done. Restart Claude Code, then the 'unlock-file' skill will be available." -ForegroundColor Green
+Write-Host "Done. Restart your agent client (for Claude Code, reopen the session), then the 'unlock-file' skill will be available." -ForegroundColor Green
