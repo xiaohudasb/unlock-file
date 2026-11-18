@@ -12,10 +12,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Dest = $Dest.TrimEnd('\', '/')
-$skillSrc = Join-Path $PSScriptRoot "unlock-file"
+$skillSrc = $PSScriptRoot
 
 if (-not (Test-Path (Join-Path $skillSrc "SKILL.md"))) {
-    throw "Cannot find unlock-file\SKILL.md next to install.ps1."
+    throw "Cannot find SKILL.md next to install.ps1."
 }
 if ((Split-Path -Leaf $Dest) -ne "unlock-file") {
     throw "Destination folder must be named 'unlock-file' (it must match the skill name). Got: $Dest"

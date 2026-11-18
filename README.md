@@ -66,8 +66,8 @@ flowchart TD
 ### 方式一：安装脚本
 
 ```powershell
-git clone https://github.com/xiaohudasb/claude-skill-unlock-file.git
-cd claude-skill-unlock-file
+git clone https://github.com/xiaohudasb/unlock-file.git
+cd unlock-file
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
@@ -90,13 +90,15 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -Dest "C:\path\to\skills\
 以 Claude Code 为例：
 
 ```powershell
-git clone https://github.com/xiaohudasb/claude-skill-unlock-file.git
+git clone https://github.com/xiaohudasb/unlock-file.git
+cd unlock-file
 $dest = "$env:USERPROFILE\.claude\skills\unlock-file"
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-Copy-Item -Recurse -Force .\claude-skill-unlock-file\unlock-file\* $dest
+Copy-Item -Force .\SKILL.md $dest
+Copy-Item -Recurse -Force .\scripts $dest
 ```
 
-其他客户端：把仓库里的 `unlock-file` 文件夹整个复制到该客户端的技能目录，并确保文件夹名是 `unlock-file`。不同客户端使用不同的技能目录，具体位置请查阅对应客户端文档。
+其他客户端：把仓库根目录（包含 `SKILL.md` 和 `scripts/`）复制或克隆到该客户端的技能目录，并确保最后一级目录名是 `unlock-file`。不同客户端使用不同的技能目录，具体位置请查阅对应客户端文档。
 
 安装后重新打开客户端会话；是否自动出现在可用技能列表中，由客户端实现决定。
 
@@ -127,16 +129,16 @@ python scripts/unlock_file.py "D:/项目/台账.xlsx" --json
 
 ```bash
 # 默认：检测 + 优雅关闭
-python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --json
+python scripts/unlock_file.py "D:/项目/台账.xlsx" --json
 
 # 只检测，不关闭任何文件
-python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --no-close --json
+python scripts/unlock_file.py "D:/项目/台账.xlsx" --no-close --json
 
 # 有未保存修改时保存后关闭（仅 COM 路线有效）
-python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --save --json
+python scripts/unlock_file.py "D:/项目/台账.xlsx" --save --json
 
 # 强杀占用进程（最后手段，未保存修改会丢失）
-python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill --json
+python scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill --json
 ```
 
 | 参数 | 说明 |
@@ -198,7 +200,7 @@ python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill -
 | 客户端 | 说明 |
 |---|---|
 | Claude Code | `install.ps1` 默认安装到 `%USERPROFILE%\.claude\skills\unlock-file`；技能会自动加载 |
-| 其他支持 Agent Skills 的客户端 | 把 `unlock-file/` 复制到该客户端的技能目录；是否自动触发由客户端决定 |
+| 其他支持 Agent Skills 的客户端 | 把仓库根目录复制到该客户端的技能目录；是否自动触发由客户端决定 |
 
 ### 系统与应用
 
@@ -222,15 +224,14 @@ python unlock-file/scripts/unlock_file.py "D:/项目/台账.xlsx" --force-kill -
 ## 目录结构
 
 ```
-claude-skill-unlock-file/
-├── unlock-file/
-│   ├── SKILL.md              # Agent Skill 说明（触发条件、安全规则、工作流）
-│   └── scripts/
-│       └── unlock_file.py    # 检测与解除占用脚本
+unlock-file/
+├── SKILL.md              # Agent Skill 说明（触发条件、安全规则、工作流）
+├── scripts/
+│   └── unlock_file.py    # 检测与解除占用脚本
 ├── README.md
 ├── LICENSE
 ├── .gitignore
-└── install.ps1               # Windows 安装脚本
+└── install.ps1           # Windows 安装脚本
 ```
 
 ## 开发与测试
@@ -241,10 +242,10 @@ python -c "import openpyxl; w=openpyxl.Workbook(); w.save('test.xlsx')"
 powershell -c "Start-Process test.xlsx"    # 用 WPS/Excel 打开
 
 # 2. 只检测
-python unlock-file/scripts/unlock_file.py test.xlsx --no-close --json    # 期望 exit=3, status=locked
+python scripts/unlock_file.py test.xlsx --no-close --json    # 期望 exit=3, status=locked
 
 # 3. 解除
-python unlock-file/scripts/unlock_file.py test.xlsx --json               # 期望 exit=0, status=closed
+python scripts/unlock_file.py test.xlsx --json               # 期望 exit=0, status=closed
 
 # 4. 验证可写
 python -c "import openpyxl; w=openpyxl.load_workbook('test.xlsx'); w.save('test.xlsx')"
@@ -256,7 +257,7 @@ A portable Agent Skill for Windows that automatically releases file locks (Excel
 
 It follows the [Agent Skills](https://agentskills.io) open format (`SKILL.md` plus optional scripts) and can be loaded by any compatible client. Claude Code is one supported client.
 
-Install with `install.ps1` (defaults to Claude Code's `%USERPROFILE%\.claude\skills\unlock-file`), or copy the `unlock-file/` folder into your client's skills directory. The folder must be named `unlock-file`.
+Install with `install.ps1` (defaults to Claude Code's `%USERPROFILE%\.claude\skills\unlock-file`), or copy this repository into your client's skills directory. The folder must be named `unlock-file`.
 
 ## License
 
